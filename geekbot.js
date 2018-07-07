@@ -1,7 +1,7 @@
 const faker = require('faker')
 const chalk = require('chalk')
 const arg = require('arg')
-const Slack = require('./slack')
+const chrono = require('chrono-node')
 const githubActivity = require('./githubActivity')
 const utils = require('./utils')
 
@@ -16,6 +16,7 @@ async function main() {
       '--user': String,
       '--help': Boolean,
       '--watch': Boolean,
+      '--time': String,
 
       // Aliases
       '-w': '--watch',
@@ -24,6 +25,7 @@ async function main() {
   } catch (error) {
     // Ignore unknown flag error
   }
+  args = Object.assign({ '--watch': false, '--time': 'today' }, args)
 
   if (!SLACK_TOKEN || !args['--user']) {
     console.log(`geekbot.js
@@ -34,8 +36,7 @@ ${chalk.bold.white('ENV variables')}:
 ${chalk.bold.white('Flags')}:
   --user, -u    Github username. Required
   --watch, -w   Stays open watching for new geekbot chats. Defaults to false and logs to stdout
-  --yesterday   Force yesterdays text
-  --today       Force todays text
+  --time        Timeframe to look for Github activity. Defaults to today (for each run). It uses supports natural language via https://github.com/wanasit/chrono
 `)
     return process.exit()
   }
@@ -49,33 +50,29 @@ async function run(args) {
     const geekbotId = await slack.getGeekbotId()
 
     slack.onUserMessage(geekbotId, async function(message) {
-      const timestamp = parseInt(message.ts, 10) * 1000
-
-      if (timestamp > utils.getToday().getTime()) {
-        switch (message) {
-          case 'How do you feel today?':
-            await slack.postMessage(geekbotId, getHowDoYouFeel())
-            break
-          case 'What did you do yesterday?': {
-            const activities = await getTodayActivities(args['--user'])
-            await slack.postMessage(geekbotId, getWhatDidYouDo(activities))
-            break
-          }
-          case 'What will you do today?': {
-            const activities = await getTodayActivities(args['--user'])
-            await slack.postMessage(geekbotId, getWhatWillYouDo(activities))
-            break
-          }
-          case 'Anything blocking your progress?':
-            await slack.postMessage(geekbotId, getBlocking())
-            break
-          default:
-            break
+      switch (message) {
+        case 'How do you feel today?':
+          await slack.postMessage(geekbotId, getHowDoYouFeel())
+          break
+        case 'What did you do yesterday?': {
+          const activities = await getTodayActivities(args['--user'], args['--time'])
+          await slack.postMessage(geekbotId, getWhatDidYouDo(activities))
+          break
         }
+        case 'What will you do today?': {
+          const activities = await getTodayActivities(args['--user'], args['--time'])
+          await slack.postMessage(geekbotId, getWhatWillYouDo(activities))
+          break
+        }
+        case 'Anything blocking your progress?':
+          await slack.postMessage(geekbotId, getBlocking())
+          break
+        default:
+          break
       }
     })
   } else {
-    const activities = await getTodayActivities(args['--user'])
+    const activities = await getTodayActivities(args['--user'], args['--time'])
     if (activities.length === 0) {
       return console.log('No Github activity today, you couch potato')
     }
@@ -92,8 +89,11 @@ ${chalk.bold.white('Anything blocking your progress?')}
   }
 }
 
-async function getTodayActivities(username) {
-  return await githubActivity.filter(username)
+async function getTodayActivities(username, beforeDateText = 'today') {
+  const beforeDate = chrono.parseDate(beforeDateText, new Date())
+  const Slack = require('./slack')
+
+  return await githubActivity.filter(username, beforeDate)
 }
 
 function getHowDoYouFeel() {

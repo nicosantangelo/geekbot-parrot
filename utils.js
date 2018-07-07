@@ -10,11 +10,5 @@ module.exports = {
 
   capitalize(text = '') {
     return text[0].toUpperCase() + text.slice(1)
-  },
-
-  getToday() {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    return today
   }
 }
