@@ -1,0 +1,18 @@
+{
+  "name": "geekbot",
+  "version": "1.0.0",
+  "description": "Answer the geekbot bot automatically with Github data",
+  "main": "geekbot.js",
+  "dependencies": {
+    "@slack/client": "^4.3.1",
+    "arg": "^2.0.0",
+    "chalk": "^2.4.1",
+    "faker": "^4.1.0",
+    "prettier": "^1.13.7",
+    "request": "^2.87.0",
+    "request-promise-native": "^1.0.5"
+  },
+  "devDependencies": {},
+  "author": "",
+  "license": "ISC"
+}
