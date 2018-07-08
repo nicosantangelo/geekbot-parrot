@@ -1,0 +1,19 @@
+#!/usr/bin/env node
+'use strict'
+const node = process.argv[0] // path to node
+const token = process.argv[2] // SLACK_TOKEN
+const script = require('path').resolve(__dirname, '../geekbot.js') // path to geekbot.js
+const args = [script] // arguments for nodejs spawned process
+process.argv
+  .slice(3)
+  .forEach(arg => arg.split(' ').forEach(piece => args.push(piece))) // this splits arguments like '--user mr_dude' into '--user', 'mr_dude'
+
+// run geekbot in a spawned child process
+const geekbot = require('child_process').spawn(node, args, {
+  env: { SLACK_TOKEN: token }
+})
+// bind events from child process to this process
+geekbot.stdout.on('data', data => console.log(data.toString()))
+geekbot.stderr.on('data', data => console.log(data.toString()))
+geekbot.on('exit', code => code && console.log(`exit ${code.toString()}`))
+geekbot.on('error', error => console.log(`error: ${error.message}`))

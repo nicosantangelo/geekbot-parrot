@@ -50,5 +50,18 @@ getWhatWillYouDo(activities)
 getBlocking()
 ```
 
+## With NPM
+
+```bash
+$ npm i -g geekbot-parrot
+$ geekbot-parrot xoxp-123123123-123123123-123123123-dadvnx2190312 --user NicoSantangelo
+```
+
+or via NPX
+
+```bash
+$ npx geekbot-parrot xoxp-123123123-123123123-123123123-dadvnx2190312 --user NicoSantangelo
+```
+
 :golfing_man:
 
