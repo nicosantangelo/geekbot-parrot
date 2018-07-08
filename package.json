@@ -1,5 +1,5 @@
 {
-  "name": "geekbot",
+  "name": "geekbot-parrot",
   "version": "1.0.0",
   "description": "Answer the geekbot bot automatically with Github data",
   "main": "geekbot.js",
@@ -15,5 +15,8 @@
   },
   "devDependencies": {},
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "bin": {
+    "geekbot-parrot": "./bin/geekbot-parrot"
+  }
 }
