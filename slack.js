@@ -8,7 +8,8 @@ class Slack {
     this.users = []
   }
 
-  async getGeekbotId(cursor) {
+  async getUserId(options = {}, cursor) {
+    const { username, isBot = false } = options
     const response = await this.client.users.list({ limit: 100, cursor })
     if (!response.ok) {
       throw new Error(
@@ -18,19 +19,56 @@ class Slack {
     }
 
     const { members, response_metadata } = response
-    const geekbot = members.find(
-      member => member.name === 'geekbot' && member.is_bot === true
+    const user = members.find(
+      member => member.name === username && member.is_bot === isBot
     )
 
-    if (!geekbot) {
+    if (!user) {
       if (response_metadata.next_cursor) {
-        throw new Error('Couldn\'t find geekbot on this Slack Team')
+        throw new Error(`Couldn't find user '${username}' on this Slack Team`)
       } else {
-        return this.getGeekbotId(response_metadata.next_cursor)
+        return this.getUserId(options, response_metadata.next_cursor)
       }
     }
 
-    return geekbot.id
+    return user.id
+  }
+
+  async getUserDMChannelId(options = {}, cursor) {
+    const { userId, isBot } = options
+    const response = await this.client.im.list({ limit: 100, cursor })
+    if (!response.ok) {
+      throw new Error(
+        'An error occurred trying to get the im list from Slack',
+        response
+      )
+    }
+
+    const { ims, response_metadata } = response
+    const im = ims.find(member => member.user === userId)
+
+    if (!im) {
+      if (response_metadata.next_cursor) {
+        throw new Error(
+          `Couldn't find channel for '${userId}' on this Slack Team`
+        )
+      } else {
+        return this.getUserChannelId(options, response_metadata.next_cursor)
+      }
+    }
+
+    return im.id
+  }
+
+  async getChannelHistory(options = {}) {
+    const response = await this.client.im.history(options)
+    if (!response.ok) {
+      throw new Error(
+        'An error occurred trying to get the im history from Slack',
+        response
+      )
+    }
+    return response.messages
   }
 
   async postMessage(channel, text) {

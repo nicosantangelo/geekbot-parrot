@@ -2,6 +2,7 @@ const faker = require('faker')
 const chalk = require('chalk')
 const arg = require('arg')
 const chrono = require('chrono-node')
+const Slack = require('./Slack')
 const githubActivity = require('./githubActivity')
 const utils = require('./utils')
 
@@ -12,31 +13,29 @@ async function main() {
 
   try {
     args = arg({
-      // Types
       '--user': String,
-      '--help': Boolean,
-      '--watch': Boolean,
-      '--time': String,
-
-      // Aliases
-      '-w': '--watch',
-      '-l': '--log'
+      '--answer': String,
+      '--from': String,
+      '--help': Boolean
     })
   } catch (error) {
     // Ignore unknown flag error
   }
-  args = Object.assign({ '--watch': false, '--time': 'today' }, args)
+  args = Object.assign({ '--answer': 'log', '--time': 'yesterday' }, args)
 
-  if (!SLACK_TOKEN || !args['--user']) {
-    console.log(`geekbot.js
-
-${chalk.bold.white('ENV variables')}:
+  if (!SLACK_TOKEN || !args['--user'] || args['--help']) {
+    console.log(`${chalk.bold.white('ENV variables')}:
   SLACK_TOKEN   You can get it from https://api.slack.com/custom-integrations/legacy-tokens
 
 ${chalk.bold.white('Flags')}:
-  --user, -u    Github username. Required
-  --watch, -w   Stays open watching for new geekbot chats. Defaults to false and logs to stdout
-  --time        Timeframe to look for Github activity. Defaults to today (for each run). It uses supports natural language via https://github.com/wanasit/chrono
+  --user    Github username. Required
+  --answer  Stays open watching for new geekbot chats. Options:
+              - respond: Try to answer the current geekbot flow
+              - watch: Works as 'respond' but stays open watching for new messages
+              - log: pipe result to stdout
+            Defaults to 'log'
+  --from    Timeframe to look for Github activity. Defaults to yesterday (for each run). It supports natural language via https://github.com/wanasit/chrono
+  --help    Print this help
 `)
     return process.exit()
   }
@@ -45,40 +44,54 @@ ${chalk.bold.white('Flags')}:
 }
 
 async function run(args) {
-  if (args['--watch']) {
-    const slack = new Slack(SLACK_TOKEN)
-    const geekbotId = await slack.getGeekbotId()
+  const activities = await getActivities(args['--user'], args['--from'])
+  if (activities.length === 0) {
+    return console.log('No Github activity, you couch potato')
+  }
 
-    slack.onUserMessage(geekbotId, async function(message) {
-      switch (message) {
-        case 'How do you feel today?':
+  switch (args['--answer']) {
+    case 'respond':
+    case 'watch': {
+      const slack = new Slack(SLACK_TOKEN)
+      const geekbotId = await slack.getUserId({
+        username: 'geekbot',
+        isBot: true
+      })
+
+      const channelId = await slack.getUserDMChannelId({ userId: geekbotId })
+      const channelHistory = await slack.getChannelHistory({
+        channel: channelId,
+        count: 1,
+        unreads: true
+      })
+      const lastMessage = channelHistory[0]
+      const exitOnEnd = args['--answer'] === 'respond'
+
+      await answerGeekbot(lastMessage.text)
+
+      slack.onUserMessage(geekbotId, message => answerGeekbot(message.text))
+
+      async function answerGeekbot(message) {
+        if (message.search('How do you feel today?') !== -1) {
           await slack.postMessage(geekbotId, getHowDoYouFeel())
-          break
-        case 'What did you do yesterday?': {
-          const activities = await getTodayActivities(args['--user'], args['--time'])
+        } else if (message.search('What did you do yesterday?') !== -1) {
           await slack.postMessage(geekbotId, getWhatDidYouDo(activities))
-          break
-        }
-        case 'What will you do today?': {
-          const activities = await getTodayActivities(args['--user'], args['--time'])
+        } else if (message.search('What will you do today?') !== -1) {
           await slack.postMessage(geekbotId, getWhatWillYouDo(activities))
-          break
-        }
-        case 'Anything blocking your progress?':
+        } else if (message.search('Anything blocking your progress?') !== -1) {
           await slack.postMessage(geekbotId, getBlocking())
-          break
-        default:
-          break
+          if (exitOnEnd) process.exit()
+        } else {
+          console.log(`Don't know how to answer to ${message}`)
+          if (exitOnEnd) process.exit()
+        }
       }
-    })
-  } else {
-    const activities = await getTodayActivities(args['--user'], args['--time'])
-    if (activities.length === 0) {
-      return console.log('No Github activity today, you couch potato')
+      break
     }
-
-    // prettier-ignore
-    console.log(`${chalk.bold.white('How do you feel today?')}
+    case 'log':
+    default: {
+      // prettier-ignore
+      console.log(`${chalk.bold.white('How do you feel today?')}
   ${getHowDoYouFeel()}
 ${chalk.bold.white('What did you do yesterday?')}
   ${getWhatDidYouDo(activities, '\n  ')}
@@ -86,10 +99,12 @@ ${chalk.bold.white('What will you do today?')}
   ${getWhatWillYouDo(activities)}
 ${chalk.bold.white('Anything blocking your progress?')}
   ${getBlocking()}`)
+      break
+    }
   }
 }
 
-async function getTodayActivities(username, beforeDateText = 'today') {
+async function getActivities(username, beforeDateText = 'today') {
   const beforeDate = chrono.parseDate(beforeDateText, new Date())
   const Slack = require('./slack')
 

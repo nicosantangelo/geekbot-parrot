@@ -8,7 +8,7 @@ Run this script and answer it with your github activity.
 ```bash
 git clone (...)
 npm install
-node geekbot.js
+node geekbot.js --help
 ```
 
 to see the options. You'll need a [Slack token](https://api.slack.com/custom-integrations/legacy-tokens)
