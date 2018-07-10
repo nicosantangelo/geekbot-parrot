@@ -81,24 +81,34 @@ class Slack {
     }
 
     if (!this.rtm) {
-      this.startRTM()
+      throw new Error('You need to start RTM first')
     }
 
     this.rtm.on('message', message => {
       if (message.user === userId) {
+        console.log('ON MESSAGE =>', message.text)
         callback(message)
       }
     })
   }
 
-  startRTM() {
+  async startRTM() {
     this.rtm = new RTMClient(this.token)
     this.rtm.start()
+    return new Promise(resolve =>
+      this.rtm.on('connected', message => resolve())
+    )
   }
 
-  stopRTM() {
-    this.rtm.stop()
-    this.rtm = undefined
+  async stopRTM() {
+    this.rtm.disconnect()
+
+    return new Promise(resolve =>
+      this.rtm.on('disconnected', () => {
+        this.rtm = undefined
+        resolve()
+      })
+    )
   }
 }
 

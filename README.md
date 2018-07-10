@@ -8,7 +8,7 @@ Run this script and answer it with your github activity.
 ```bash
 git clone (...)
 npm install
-node geekbot.js --help
+node index.js --help
 ```
 
 to see the options. You'll need a [Slack token](https://api.slack.com/custom-integrations/legacy-tokens)
@@ -17,7 +17,7 @@ to see the options. You'll need a [Slack token](https://api.slack.com/custom-int
 
 ```
 ➜  geekbot git:(master) ✗
-SLACK_TOKEN=xoxp-123123123-123123123-123123123-dadvnx2190312 node geekbot.js --user NicoSantangelo
+SLACK_TOKEN=xoxp-123123123-123123123-123123123-dadvnx2190312 node index.js --user NicoSantangelo
 
 How do you feel today?
   Awesome
@@ -35,18 +35,17 @@ Anything blocking your progress?
 
 ```
 ➜  geekbot git:(master) ✗
-SLACK_TOKEN=xoxp-123123123-123123123-123123123-dadvnx2190312 node geekbot.js --user NicoSantangelo --watch
+SLACK_TOKEN=xoxp-123123123-123123123-123123123-dadvnx2190312 node index.js --user NicoSantangelo --watch
 ```
 
 ## Changing the responses
 
-If you don't like the the script output you can clone and change the following functions on geekbot.js:
+If you don't like the the script output you can clone and change the following functions on `Geekbot.js`:
 
 ```javascript
-getTodayActivities(username, beforeDateText = 'today')
 getHowDoYouFeel()
-getWhatDidYouDo(activities, separator = '\n')
-getWhatWillYouDo(activities)
+getWhatDidYouDo(separator = '\n')
+getWhatWillYouDo()
 getBlocking()
 ```
 
