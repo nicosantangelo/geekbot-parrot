@@ -21,7 +21,6 @@ class GithubActivity {
 
     return activities.filter(
       activity =>
-        true ||
         !beforeDate ||
         new Date(activity.created_at).getTime() >= beforeDate.getTime()
     )
@@ -29,6 +28,7 @@ class GithubActivity {
 
   getRepoName(activity) {
     let name = ''
+
 
     if (!activity) {
       name = ''

@@ -4,8 +4,9 @@ const GithubActivity = require('./GithubActivity')
 const utils = require('./utils')
 
 class Geekbot {
-  constructor(username, organizations = []) {
+  constructor(username, organizations = [], beforeDateText) {
     this.githubActivity = new GithubActivity(username, organizations)
+    this.beforeDateText = beforeDateText
   }
 
   getHowDoYouFeel() {
@@ -41,8 +42,8 @@ class Geekbot {
     return utils.capitalize(faker.hacker.phrase())
   }
 
-  async getActivities(beforeDateText) {
-    const beforeDate = chrono.parseDate(beforeDateText, new Date())
+  async getActivities() {
+    const beforeDate = chrono.parseDate(this.beforeDateText, new Date())
     return await this.githubActivity.filter(beforeDate)
   }
 

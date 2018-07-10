@@ -20,7 +20,7 @@ async function main() {
   } catch (error) {
     // Ignore unknown flag error
   }
-  args = Object.assign({ '--answer': 'log', '--time': 'yesterday' }, args)
+  args = Object.assign({ '--answer': 'log', '--from': 'yesterday' }, args)
 
   if (!SLACK_TOKEN || !args['--user'] || args['--help']) {
     console.log(`${chalk.bold.white('ENV variables')}:
