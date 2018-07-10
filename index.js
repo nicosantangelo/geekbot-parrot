@@ -20,7 +20,10 @@ async function main() {
   } catch (error) {
     // Ignore unknown flag error
   }
-  args = Object.assign({ '--answer': 'log', '--from': 'yesterday' }, args)
+  args = Object.assign(
+    { '--organizations': '', '--answer': 'log', '--from': 'yesterday' },
+    args
+  )
 
   if (!SLACK_TOKEN || !args['--user'] || args['--help']) {
     console.log(`${chalk.bold.white('ENV variables')}:
@@ -40,6 +43,8 @@ ${chalk.bold.white('Flags')}:
                   Defaults to 'log'
 
   --from          Timeframe to look for Github activity. Defaults to yesterday (for each run). It supports natural language via https://github.com/wanasit/chrono
+
+  --cancelOnEmpty Send a cancel if you don't have any Github activity for the given timeframe.
 
   --help          Print this help
 `)
@@ -80,6 +85,13 @@ async function run(args) {
       await answerGeekbot(lastMessage.text)
 
       async function answerGeekbot(message) {
+        if (!(await geekbot.hasActivities())) {
+          console.log(
+            `Couldn't find any Github activity for the given timeframe. You may want to send a cancel?\nMessage skipped: "${message}"`
+          )
+          return exitOnEnd ? await exit(slack) : geekbot.resetCache()
+        }
+
         if (message.search('How do you feel today?') !== -1) {
           await slack.postMessage(geekbotId, geekbot.getHowDoYouFeel())
         } else if (message.search('What did you do yesterday?') !== -1) {
@@ -98,8 +110,9 @@ async function run(args) {
     }
     case 'log':
     default: {
-      // prettier-ignore
-      console.log(`${chalk.bold.white('How do you feel today?')}
+      if (await geekbot.hasActivities()) {
+        // prettier-ignore
+        console.log(`${chalk.bold.white('How do you feel today?')}
   ${geekbot.getHowDoYouFeel()}
 ${chalk.bold.white('What did you do yesterday?')}
   ${await geekbot.getWhatDidYouDo('\n  ')}
@@ -107,6 +120,11 @@ ${chalk.bold.white('What will you do today?')}
   ${await geekbot.getWhatWillYouDo()}
 ${chalk.bold.white('Anything blocking your progress?')}
   ${geekbot.getBlocking()}`)
+      } else {
+        console.log(
+          `Couldn't find any Github activity for the given timeframe, skipping.\nYou may want to send a cancel?`
+        )
+      }
       break
     }
   }

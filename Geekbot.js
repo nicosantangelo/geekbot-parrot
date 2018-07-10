@@ -5,30 +5,35 @@ const utils = require('./utils')
 
 class Geekbot {
   constructor(username, organizations = [], beforeDateText) {
+    organizations = organizations.filter(orgName => !!orgName)
+
     this.githubActivity = new GithubActivity(username, organizations)
     this.beforeDateText = beforeDateText
+    this.activities = []
   }
 
   getHowDoYouFeel() {
+    this.resetCache()
     const howDowYouFeel = faker.commerce.productAdjective()
     return utils.capitalize(howDowYouFeel)
   }
 
   async getWhatDidYouDo(separator = '\n') {
-    const activities = await this.getActivities()
-    const text = this.activitiesToText(activities, separator)
-    return text || 'nope'
+    let text = 'nope'
+    if (await this.hasActivities()) {
+      text = await this.activitiesToText(separator)
+    }
+    return text
   }
 
   async getWhatWillYouDo() {
     const activities = await this.getActivities()
-    let repoNames = activities
-      .map(activity => this.githubActivity.getRepoName(activity))
-      .filter(name => !!name)
+    if (activities.length === 0) return 'nope'
 
+    let repoNames = activities.map(activity =>
+      this.githubActivity.getRepoName(activity)
+    )
     repoNames = Array.from(new Set(repoNames))
-
-    if (repoNames.length === 0) return 'nope'
 
     const reposText =
       repoNames.length > 1
@@ -39,20 +44,40 @@ class Geekbot {
   }
 
   getBlocking() {
+    this.resetCache()
     return utils.capitalize(faker.hacker.phrase())
   }
 
   async getActivities() {
-    const beforeDate = chrono.parseDate(this.beforeDateText, new Date())
-    return await this.githubActivity.filter(beforeDate)
+    if (this.activities.length === 0) {
+      const beforeDate = chrono.parseDate(this.beforeDateText, new Date())
+      const activities = await this.githubActivity.filter(beforeDate)
+
+      for (const activity of activities) {
+        if (this.inOrganizations(activity)) {
+          this.activities.push(activity)
+        }
+      }
+    }
+
+    return this.activities
   }
 
-  activitiesToText(activities, separator = ', ') {
+  async hasActivities() {
+    return (await this.getActivities()).length > 0
+  }
+
+  inOrganizations(activity) {
+    return !!this.githubActivity.getRepoName(activity)
+  }
+
+  async activitiesToText(separator = ', ') {
+    const activities = await this.getActivities()
     const repoNames = new Set()
     let texts = []
 
     for (const activity of activities) {
-      const repoName = this.githubActivity.getRepoName(activity, true)
+      const repoName = this.githubActivity.getRepoName(activity)
       if (repoNames.has(repoName)) continue
 
       const activityText = this.activityToText(activity)
@@ -71,8 +96,9 @@ class Geekbot {
 
     switch (activity.type) {
       case 'CreateEvent': {
-        const description = ''
-        if (activity.description) description = ` (${activity.description})`
+        const description = activity.description
+          ? ` (${activity.description})`
+          : ''
 
         return `Created ${repoName}${description}`
       }
@@ -81,6 +107,10 @@ class Geekbot {
       default:
         return `Worked on ${repoName}`
     }
+  }
+
+  resetCache() {
+    this.activities = []
   }
 }
 
