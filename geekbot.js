@@ -3,7 +3,7 @@ const chalk = require('chalk')
 const arg = require('arg')
 const chrono = require('chrono-node')
 const Slack = require('./Slack')
-const githubActivity = require('./githubActivity')
+const GithubActivity = require('./GithubActivity')
 const utils = require('./utils')
 
 const SLACK_TOKEN = utils.envGet('SLACK_TOKEN', '') // https://api.slack.com/custom-integrations/legacy-tokens
@@ -14,6 +14,7 @@ async function main() {
   try {
     args = arg({
       '--user': String,
+      '--organizations': String,
       '--answer': String,
       '--from': String,
       '--help': Boolean
@@ -28,14 +29,16 @@ async function main() {
   SLACK_TOKEN   You can get it from https://api.slack.com/custom-integrations/legacy-tokens
 
 ${chalk.bold.white('Flags')}:
-  --user    Github username. Required
-  --answer  Stays open watching for new geekbot chats. Options:
-              - respond: Try to answer the current geekbot flow
-              - watch: Works as 'respond' but stays open watching for new messages
-              - log: pipe result to stdout
-            Defaults to 'log'
-  --from    Timeframe to look for Github activity. Defaults to yesterday (for each run). It supports natural language via https://github.com/wanasit/chrono
-  --help    Print this help
+  --user          Github username. Required
+  --organizations Which organizations to use when filtering github activity. It supports multiple organizations separated by spaces.
+                  An username might acts as an organization, so bear that in mind. The repo names look like: `orgName/repoName`. Defaults to all organizations
+  --answer        Stays open watching for new geekbot chats. Options:
+                    - respond: Try to answer the current geekbot flow
+                    - watch: Works as 'respond' but stays open watching for new messages
+                    - log: pipe result to stdout
+                  Defaults to 'log'
+  --from          Timeframe to look for Github activity. Defaults to yesterday (for each run). It supports natural language via https://github.com/wanasit/chrono
+  --help          Print this help
 `)
     return process.exit()
   }
@@ -44,10 +47,11 @@ ${chalk.bold.white('Flags')}:
 }
 
 async function run(args) {
-  const activities = await getActivities(args['--user'], args['--from'])
-  if (activities.length === 0) {
-    return console.log('No Github activity, you couch potato')
-  }
+  const geekbot = new Geekbot(
+    args['--user'],
+    args['--organizations'].split(' '),
+    args['--from']
+  )
 
   switch (args['--answer']) {
     case 'respond':
@@ -73,13 +77,13 @@ async function run(args) {
 
       async function answerGeekbot(message) {
         if (message.search('How do you feel today?') !== -1) {
-          await slack.postMessage(geekbotId, getHowDoYouFeel())
+          await slack.postMessage(geekbotId, geekbot.getHowDoYouFeel())
         } else if (message.search('What did you do yesterday?') !== -1) {
-          await slack.postMessage(geekbotId, getWhatDidYouDo(activities))
+          await slack.postMessage(geekbotId, await geekbot.getWhatDidYouDo())
         } else if (message.search('What will you do today?') !== -1) {
-          await slack.postMessage(geekbotId, getWhatWillYouDo(activities))
+          await slack.postMessage(geekbotId, await geekbot.getWhatWillYouDo())
         } else if (message.search('Anything blocking your progress?') !== -1) {
-          await slack.postMessage(geekbotId, getBlocking())
+          await slack.postMessage(geekbotId, geekbot.getBlocking())
           if (exitOnEnd) process.exit()
         } else {
           console.log(`Don't know how to answer to ${message}`)
@@ -92,52 +96,96 @@ async function run(args) {
     default: {
       // prettier-ignore
       console.log(`${chalk.bold.white('How do you feel today?')}
-  ${getHowDoYouFeel()}
+  ${geekbot.getHowDoYouFeel()}
 ${chalk.bold.white('What did you do yesterday?')}
-  ${getWhatDidYouDo(activities, '\n  ')}
+  ${await geekbot.getWhatDidYouDo('\n  ')}
 ${chalk.bold.white('What will you do today?')}
-  ${getWhatWillYouDo(activities)}
+  ${await geekbot.getWhatWillYouDo()}
 ${chalk.bold.white('Anything blocking your progress?')}
-  ${getBlocking()}`)
+  ${geekbot.getBlocking()}`)
       break
     }
   }
 }
 
-async function getActivities(username, beforeDateText = 'today') {
-  const beforeDate = chrono.parseDate(beforeDateText, new Date())
-  const Slack = require('./slack')
+class Geekbot {
+  constructor(username, organizations = []) {
+    this.githubActivity = new GithubActivity(username, organizations)
+  }
 
-  return await githubActivity.filter(username, beforeDate)
-}
+  getHowDoYouFeel() {
+    const howDowYouFeel = faker.commerce.productAdjective()
+    return utils.capitalize(howDowYouFeel)
+  }
 
-function getHowDoYouFeel() {
-  const howDowYouFeel = faker.commerce.productAdjective()
-  return utils.capitalize(howDowYouFeel)
-}
+  async getWhatDidYouDo(separator = '\n') {
+    const activities = await this.getActivities()
+    const text = this.activitiesToText(activities, separator)
+    return text || 'nope'
+  }
 
-function getWhatDidYouDo(activities, separator = '\n') {
-  return githubActivity.arrayToText(activities, separator)
-}
+  async getWhatWillYouDo() {
+    const activities = await this.getActivities()
+    let repoNames = activities
+      .map(activity => this.githubActivity.getRepoName(activity))
+      .filter(name => !!name)
 
-function getWhatWillYouDo(activities) {
-  let repoNames = activities.map(activity =>
-    githubActivity.getRepoName(activity)
-  )
-  repoNames = Array.from(new Set(repoNames))
+    repoNames = Array.from(new Set(repoNames))
 
-  if (repoNames.length === 0) return '¯\\_(ツ)_/¯'
+    if (repoNames.length === 0) return 'nope'
 
-  const reposText =
-    repoNames.length > 1
-      ? `${repoNames.slice(0, -1).join(', ')} and ${repoNames.slice(-1)[0]}`
-      : repoNames[0]
+    const reposText =
+      repoNames.length > 1
+        ? `${repoNames.slice(0, -1).join(', ')} and ${repoNames.slice(-1)[0]}`
+        : repoNames[0]
 
-  return `Probably more work on ${reposText}`
-}
+    return `Probably more work on ${reposText}`
+  }
 
-function getBlocking() {
-  return utils.capitalize(faker.hacker.phrase())
+  getBlocking() {
+    return utils.capitalize(faker.hacker.phrase())
+  }
+
+  async getActivities(beforeDateText) {
+    const beforeDate = chrono.parseDate(beforeDateText, new Date())
+    return await this.githubActivity.filter(beforeDate)
+  }
+
+  activitiesToText(activities, separator = ', ') {
+    const repoNames = new Set()
+    let texts = []
+
+    for (const activity of activities) {
+      const repoName = this.githubActivity.getRepoName(activity, true)
+      if (repoNames.has(repoName)) continue
+
+      const activityText = this.activityToText(activity)
+      if (!activityText) continue
+
+      repoNames.add(repoName)
+      texts.push(activityText)
+    }
+
+    return texts.join(separator)
+  }
+
+  activityToText(activity) {
+    const repoName = this.githubActivity.getRepoName(activity)
+    if (!repoName) return ''
+
+    switch (activity.type) {
+      case 'CreateEvent': {
+        const description = ''
+        if (activity.description) description = ` (${activity.description})`
+
+        return `Created ${repoName}${description}`
+      }
+      case 'WatchEvent':
+        return ''
+      default:
+        return `Worked on ${repoName}`
+    }
+  }
 }
 
 main().catch(error =>
