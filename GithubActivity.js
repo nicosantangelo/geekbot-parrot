@@ -29,7 +29,6 @@ class GithubActivity {
   getRepoName(activity) {
     let name = ''
 
-
     if (!activity) {
       name = ''
     } else if (activity.repository && activity.repository.name) {

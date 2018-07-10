@@ -44,8 +44,6 @@ ${chalk.bold.white('Flags')}:
 
   --from          Timeframe to look for Github activity. Defaults to yesterday (for each run). It supports natural language via https://github.com/wanasit/chrono
 
-  --cancelOnEmpty Send a cancel if you don't have any Github activity for the given timeframe.
-
   --help          Print this help
 `)
     return process.exit()
