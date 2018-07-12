@@ -1,6 +1,6 @@
 {
   "name": "geekbot-parrot",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Answer the geekbot bot automatically with Github data",
   "main": "index.js",
   "dependencies": {

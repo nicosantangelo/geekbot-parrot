@@ -99,8 +99,9 @@ class Geekbot {
         const description = activity.description
           ? ` (${activity.description})`
           : ''
+        const verb = activity.ref_type === 'repository' ? 'Created' : 'Worked on'
 
-        return `Created ${repoName}${description}`
+        return `${verb} ${repoName}${description}`
       }
       case 'WatchEvent':
         return ''
